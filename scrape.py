@@ -150,7 +150,7 @@ def setcookies(cookiejar, host, lines):
 RAW = object() # This sentinel value for 'charset' means "don't decode".
 
 def fetch(url, data='', agent=None, referrer=None, charset=None, verbose=0,
-          cookiejar={}):
+          cookiejar={}, auxheaders={}):
     """Make an HTTP or HTTPS request.  If 'data' is given, do a POST;
     otherwise do a GET.  If 'agent' and/or 'referrer' are given, include
     them as User-Agent and Referer headers in the request, respectively.
@@ -187,6 +187,7 @@ def fetch(url, data='', agent=None, referrer=None, charset=None, verbose=0,
         if query:
             path += '?' + query
         headers = {'host': host, 'accept': '*/*'}
+        headers.update(auxheaders)
         if data:
             headers['content-type'] = 'application/x-www-form-urlencoded'
             headers['content-length'] = len(data)
@@ -244,7 +245,7 @@ def fetch(url, data='', agent=None, referrer=None, charset=None, verbose=0,
 
 class Session:
     """A Web-browsing session.  Exposed attributes:
-    
+
         agent   - the User-Agent string (clients can set this attribute)
         url     - the last successfully fetched URL
         status  - the status code of the last request
@@ -263,6 +264,7 @@ class Session:
         self.headers = {}
         self.cookiejar = {}
         self.history = []
+        self.auxheaders = {} # Auxiliary headers to append to all requests.
 
     def go(self, url, data='', redirects=10, referrer=True, charset=None):
         """Navigate to a given URL.  If the URL is relative, it is resolved
@@ -285,7 +287,7 @@ class Session:
         while 1:
             self.url, self.status, self.message, self.headers, self.content = \
                 fetch(url, data, self.agent, referrer, charset, self.verbose,
-                      self.cookiejar)
+                      self.cookiejar, self.auxheaders)
             if redirects:
                 if self.status in [301, 302] and 'location' in self.headers:
                     url, data = urljoin(url, self.headers['location']), ''
@@ -403,7 +405,7 @@ urlquoted.update(dict((c, c) for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
                                       '0123456789._-'))
 def urlquote(text):
     return ''.join(map(urlquoted.get, text))
-    
+
 def urlencode(params):
     pairs = ['%s=%s' % (urlquote(key), urlquote(value).replace('%20', '+'))
              for key, value in params.items()]
@@ -440,7 +442,7 @@ def striptags(html):
         pos = endmatch.end()
     chunks.append(html[pos:])
     html = ''.join(chunks)
-        
+
     # Break up the text into paragraphs and lines, then remove all other tags.
     paragraphs = []
     for paragraph in parasplitter.split(html):
